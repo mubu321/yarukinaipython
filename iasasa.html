@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>めんどくさがり屋過ぎるpython</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      padding: 20px;
+      background-color: #2e2e2e;
+      color: #e0e0e0;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    textarea {
+      width: 100%;
+      height: 250px;
+      font-family: monospace;
+      background-color: #333;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    #output {
+      margin-top: 20px;
+      background-color: #333;
+      color: #e0e0e0;
+      padding: 10px;
+      white-space: pre-wrap;
+      border: 1px solid #444;
+      min-height: 150px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    button {
+      background-color: #444;
+      color: #e0e0e0;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      margin: 10px 5px 10px 0;
+      transition: all 0.3s;
+    }
+    button:hover {
+      background-color: #555;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .controls {
+      display: flex;
+      align-items: center;
+    }
+    .laziness-indicator {
+      margin-left: 20px;
+      display: flex;
+      align-items: center;
+    }
+    .examples-dropdown {
+      background-color: #444;
+      color: #e0e0e0;
+      border: none;
+      padding: 8px;
+      margin-right: 10px;
+    }
+    .mood-indicator {
+      margin-left: 15px;
+      font-size: 24px;
+    }
+    .highlight {
+      background-color: #553355;
+    }
+    #error-message {
+      color: #ff6b6b;
+      margin-top: 10px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>Python</h2>
+    <div class="controls">
+      <select id="examples" class="examples-dropdown">
+        <option value="">-- サンプルコード --</option>
+        <option value="hello">Hello World</option>
+        <option value="calc">簡単な計算</option>
+        <option value="loop">ループの例</option>
+        <option value="func">関数の例</option>
+        <option value="list">リストの操作</option>
+      </select>
+      <div class="laziness-indicator">
+        <span>面倒くささ: </span>
+        <span id="laziness-value">1</span>
+        <span> / 10</span>
+        <span class="mood-indicator" id="mood">😊</span>
+      </div>
+    </div>
+  </div>
+  
+  <textarea id="code" placeholder="print('Hello, world!')"></textarea><br>
+  <button id="run-btn" onclick="runCode()">実行する</button>
+  <button id="clear-btn" onclick="clearOutput()">クリア</button>
+  <div id="error-message"></div>
+  <div id="output"></div>
+
+  <script>
+    let variables = {};
+    let lists = {};
+    let functions = {};
+    const complaints = [
+      "めんどくさい", "長すぎる", "やる気出ない", "ちょっと休ませて", "眠い", 
+      "今日は疲れた", "難しすぎる", "考えたくない", "もう無理", "面倒だな",
+      "今日は休日じゃない？", "コードが多すぎる", "そこまでやる必要ある？"
+    ];
+    
+    const excuses = [
+      "突然眠くなった", "集中力が切れた", "ちょっと休憩中", "やる気スイッチが入らない",
+      "コーヒーブレイク中", "エラーの修正は明日やる", "今とても忙しい"
+    ];
+    
+    const moods = ["😴", "😒", "😐", "🙂", "😊"];
+    let lazinessLevel = 1;
+    
+    // 実行回数のカウンター
+    let executionCount = 0;
+    
+    // 面倒くささレベルを更新する関数
+    function updateLazinessLevel() {
+      // 実行するたびに面倒くささが上昇（最大10）
+      executionCount++;
+      lazinessLevel = Math.min(10, Math.ceil(executionCount / 2));
+      
+      document.getElementById("laziness-value").textContent = lazinessLevel;
+      
+      // 気分の絵文字を更新
+      const moodIndex = Math.min(Math.floor(lazinessLevel / 2.5), moods.length - 1);
+      document.getElementById("mood").textContent = moods[moods.length - 1 - moodIndex];
+      
+      // 面倒くささが上がるにつれて実行ボタンのテキストを変更
+      const runButton = document.getElementById("run-btn");
+      if (lazinessLevel <= 3) {
+        runButton.textContent = "実行する";
+      } else if (lazinessLevel <= 6) {
+        runButton.textContent = "実行する...";
+      } else if (lazinessLevel <= 8) {
+        runButton.textContent = "実行する（たぶん）";
+      } else {
+        runButton.textContent = "実行してみる？";
+      }
+    }
+    
+    // サンプルコード
+    const examples = {
+      hello: `print('こんにちは、世界！')\nname = '太郎'\nprint('私の名前は' + name + 'です')`,
+      
+      calc: `a = 10\nb = 5\nsum = a + b\nprint('合計: ' + sum)\nproduct = a * b\nprint('掛け算: ' + product)\n\n# 少し複雑な計算\nresult = (a + b) * 2 - 5\nprint('計算結果: ' + result)`,
+      
+      loop: `# forループの例\nfor i in range(1, 6):\n    print('カウント: ' + i)\n\n# whileループの例\ncounter = 0\nwhile counter < 5:\n    print('whileカウント: ' + counter)\n    counter = counter + 1`,
+      
+      func: `# 関数定義\ndef greet(name):\n    message = 'こんにちは、' + name + 'さん！'\n    print(message)\n    return message\n\n# 関数呼び出し\ngreet('花子')\ngreet('次郎')`,
+      
+      list: `# リストの操作\nfruits = ['りんご', 'バナナ', 'オレンジ']\nprint('フルーツリスト:')\nprint(fruits)\n\nfruits.append('ぶどう')\nprint('追加後:')\nprint(fruits)\n\nprint('最初の果物: ' + fruits[0])`
+    };
+    
+    document.getElementById("examples").addEventListener("change", function() {
+      const selected = this.value;
+      if (selected && examples[selected]) {
+        document.getElementById("code").value = examples[selected];
+      }
+    });
+
+    function getRandomComplaint() {
+      return complaints[Math.floor(Math.random() * complaints.length)];
+    }
+    
+    function getRandomExcuse() {
+      return excuses[Math.floor(Math.random() * excuses.length)];
+    }
+
+    function evaluateExpr(expr) {
+      try {
+        let evaluatedExpr = expr;
+        
+        // リスト参照の処理 (例: fruits[0])
+        const listAccessPattern = /(\w+)\[(\d+)\]/g;
+        evaluatedExpr = evaluatedExpr.replace(listAccessPattern, (match, listName, index) => {
+          if (lists[listName] && lists[listName][index] !== undefined) {
+            return JSON.stringify(lists[listName][index]);
+          }
+          return match;
+        });
+        
+        // リスト全体の参照
+        for (let listName in lists) {
+          const listRegex = new RegExp('\\b' + listName + '\\b(?!\\[)', 'g');
+          evaluatedExpr = evaluatedExpr.replace(listRegex, JSON.stringify(lists[listName]));
+        }
+        
+        // 変数の置換
+        for (let v in variables) {
+          const varRegex = new RegExp('\\b' + v + '\\b', 'g');
+          evaluatedExpr = evaluatedExpr.replace(varRegex, variables[v]);
+        }
+
+        // たまに数字をいたずらで変える (10%の確率)
+        if (Math.random() < 0.1) {
+          evaluatedExpr = evaluatedExpr.replace(/\d+/g, (num) => {
+            // 元の数値の±20%の範囲でランダムに変更
+            const originalNum = parseInt(num);
+            const variance = Math.floor(originalNum * 0.2);
+            const newNum = originalNum + Math.floor(Math.random() * variance * 2) - variance;
+            return Math.max(0, newNum);
+          });
+          evaluatedExpr += ' ← 数字が勝手に変わったかも';
+        }
+
+        // 文字列の結合 ('+' 演算子)
+        const stringConcatPattern = /'([^']*)'\s*\+\s*'([^']*)'/g;
+        while (stringConcatPattern.test(evaluatedExpr)) {
+          evaluatedExpr = evaluatedExpr.replace(stringConcatPattern, "'$1$2'");
+        }
+        
+        // 変数と文字列の結合
+        const varStringConcatPattern = /'([^']*)'\s*\+\s*(\w+)/g;
+        evaluatedExpr = evaluatedExpr.replace(varStringConcatPattern, (match, str, varName) => {
+          return `'${str}${variables[varName] || varName}'`;
+        });
+        
+        const stringVarConcatPattern = /(\w+)\s*\+\s*'([^']*)'/g;
+        evaluatedExpr = evaluatedExpr.replace(stringVarConcatPattern, (match, varName, str) => {
+          return `'${variables[varName] || varName}${str}'`;
+        });
+
+        // 基本的な数学演算の評価
+        try {
+          // 安全な式だけ評価
+          if (/^[\d\s\+\-\*\/\(\)\.]+$/.test(evaluatedExpr)) {
+            return eval(evaluatedExpr);
+          }
+          
+          // 文字列を返す場合
+          if (evaluatedExpr.startsWith("'") && evaluatedExpr.endsWith("'")) {
+            return evaluatedExpr.slice(1, -1);
+          }
+          
+          return evaluatedExpr;
+        } catch (e) {
+          return evaluatedExpr;
+        }
+      } catch (error) {
+        return `(式エラー: ${error.message})`;
+      }
+    }
+
+    function shouldIgnore(line) {
+      // 行の長さと面倒くささレベルに基づいて無視する確率を計算
+      const isLong = line.length >= 30;
+      const baseChance = isLong ? 0.3 : 0.1;
+      
+      // レベル1: ほとんど無視しない、レベル10: ほとんど全部無視
+      const lazinessFactor = lazinessLevel / 10;
+      
+      // 面倒くささが上がるほど、急激に無視する確率が上昇
+      const finalChance = baseChance * Math.pow(lazinessFactor * 1.5, 2);
+      
+      return Math.random() < finalChance;
+    }
+
+    function processListOperation(line) {
+      // リスト作成: fruits = ['りんご', 'バナナ']
+      const listCreationMatch = line.match(/^(\w+)\s*=\s*\[(.*)\]$/);
+      if (listCreationMatch) {
+        const listName = listCreationMatch[1];
+        const items = listCreationMatch[2].split(',').map(item => {
+          item = item.trim();
+          if (item.startsWith("'") && item.endsWith("'")) {
+            return item.slice(1, -1);
+          }
+          return evaluateExpr(item);
+        });
+        lists[listName] = items;
+        return `リスト ${listName} = [${items.join(', ')}] を作成`;
+      }
+      
+      // append操作: fruits.append('ぶどう')
+      const appendMatch = line.match(/^(\w+)\.append\((.*)\)$/);
+      if (appendMatch) {
+        const listName = appendMatch[1];
+        let item = appendMatch[2].trim();
+        
+        if (item.startsWith("'") && item.endsWith("'")) {
+          item = item.slice(1, -1);
+        } else {
+          item = evaluateExpr(item);
+        }
+        
+        if (lists[listName]) {
+          if (Math.random() < 0.2) {
+            // たまに間違った位置に追加
+            const randomIndex = Math.floor(Math.random() * lists[listName].length);
+            lists[listName].splice(randomIndex, 0, item);
+            return `${listName} の${randomIndex}番目に ${item} を追加したかも`;
+          } else {
+            lists[listName].push(item);
+            return `${listName} に ${item} を追加`;
+          }
+        }
+        return `リスト ${listName} が見つかりません`;
+      }
+      
+      return null;
+    }
+
+    function runCode() {
+      const code = document.getElementById("code").value;
+      
+      // 空のコードの場合はやる気レベルを上げない
+      if (code.trim() !== '') {
+        // 面倒くささレベルを更新
+        updateLazinessLevel();
+      }
+      
+      const lines = code.split('\n');
+      let output = '';
+      variables = {};
+      lists = {};
+      functions = {};
+      let skipBlock = false;
+      let insideFunction = false;
+      let currentFunc = '';
+      let funcArgs = [];
+      let funcBody = [];
+      document.getElementById("error-message").innerText = '';
+      
+
+      
+      // 実行ボタンを押したときの反応
+      // 面倒くささレベルが上がるほど実行を拒否する確率が上がる
+      const refusalChance = 0.05 + (lazinessLevel * 0.03);
+      if (Math.random() < refusalChance) {
+        // 面倒くささが高いほど愚痴も多く表示
+        let excuse = getRandomExcuse();
+        if (lazinessLevel >= 8 && Math.random() < 0.5) {
+          excuse += "。" + getRandomComplaint();
+        }
+        document.getElementById("error-message").innerText = excuse;
+        document.getElementById("output").innerText = '';
+        return;
+      }
+
+      // 空のコードの場合
+      if (code.trim() === '') {
+        document.getElementById("output").innerText = '何も書いてないよ...';
+        return;
+      }
+
+      lines.forEach((lineRaw, index) => {
+        let line = lineRaw.trim();
+        if (line === '' || line.startsWith('#')) return;
+
+        // 関数定義の処理
+        if (insideFunction && (lineRaw.startsWith('    ') || lineRaw.startsWith('\t'))) {
+          funcBody.push(lineRaw.trim());
+          return;
+        } else if (insideFunction) {
+          functions[currentFunc] = { args: funcArgs, body: funcBody.slice() };
+          output += `(関数 ${currentFunc} を記憶しました)\n`;
+          insideFunction = false;
+        }
+
+        // 面倒くささによる行の無視
+        if (shouldIgnore(line)) {
+          let complaint = Math.random() < 0.7 ? ` ← ${getRandomComplaint()}` : '';
+          output += `（無視）: ${lineRaw}${complaint}\n`;
+          return;
+        }
+
+        // print文の処理
+        if (line.startsWith('print(')) {
+          const toPrint = line.match(/print\((.*)\)/);
+          if (toPrint) {
+            const result = evaluateExpr(toPrint[1]);
+            output += `${result}\n`;
+          }
+
+        // 変数代入の処理
+        } else if (line.match(/^\w+\s*=\s*.+$/)) {
+          // リスト操作の確認
+          const listResult = processListOperation(line);
+          if (listResult) {
+            output += `${listResult}\n`;
+            return;
+          }
+          
+          const [key, val] = line.split('=').map(s => s.trim());
+          variables[key] = evaluateExpr(val);
+          output += `${key} = ${variables[key]}\n`;
+
+        // if文の処理
+        } else if (line.startsWith('if ')) {
+          const condition = line.slice(3, -1).trim();
+          const result = evaluateExpr(condition);
+          skipBlock = !result;
+          output += `(if ${condition}: ${result ? '真' : '偽'})\n`;
+
+        } else if (line.startsWith('elif ')) {
+          if (!skipBlock) {
+            // 前のif/elifがtrueだった場合はスキップ
+            skipBlock = true;
+          } else {
+            const condition = line.slice(5, -1).trim();
+            const result = evaluateExpr(condition);
+            skipBlock = !result;
+            output += `(elif ${condition}: ${result ? '真' : '偽'})\n`;
+          }
+
+        } else if (line === 'else:') {
+          skipBlock = !skipBlock;
+          output += `(else: ${!skipBlock ? '実行' : 'スキップ'})\n`;
+
+        // forループの処理
+        } else if (line.match(/^for \w+ in range\(.+\):$/)) {
+          const match = line.match(/^for (\w+) in range\((\d+)(?:,\s*(\d+))?\):$/);
+          if (match) {
+            const varName = match[1];
+            const start = match[3] ? parseInt(match[2]) : 0;
+            const end = match[3] ? parseInt(match[3]) : parseInt(match[2]);
+            
+            // 面倒くささに応じてループ回数を制限（面倒くささが高いほど少なく）
+            const maxIterations = Math.max(2, Math.round(12 - lazinessLevel * 1.2));
+            const loopCount = Math.min(end - start, maxIterations);
+            
+            output += `(forループ ${varName}, ${start}から${loopCount}回実行)\n`;
+            
+            for (let i = start; i < start + loopCount; i++) {
+              variables[varName] = i;
+              output += `  ${varName} = ${i}\n`;
+            }
+            
+            if (loopCount < end - start) {
+              output += `  ... (残り${end - start - loopCount}回は面倒なのでスキップ)\n`;
+            }
+          } else {
+            output += '(for 構文エラー)\n';
+          }
+
+        // whileループの処理
+        } else if (line.match(/^while .+:$/)) {
+          const condition = line.slice(6, -1).trim();
+          let count = 0;
+          
+          // 面倒くささに応じてループ回数を制限
+          const maxIterations = Math.max(1, Math.round(10 - lazinessLevel * 1.1));
+          
+          while (evaluateExpr(condition) && count < maxIterations) {
+            output += `(while 実行: ${count + 1}回目)\n`;
+            count++;
+          }
+          
+          if (evaluateExpr(condition) && count >= maxIterations) {
+            output += `(whileループが長いので${maxIterations}回で停止しました)\n`;
+          }
+
+        // break文の処理
+        } else if (line === 'break') {
+          output += '(break によりループを抜けました)\n';
+          skipBlock = true;
+
+        // continue文の処理
+        } else if (line === 'continue') {
+          output += '(continue により次の繰り返しへ)\n';
+
+        // 関数定義の処理
+        } else if (line.match(/^def \w+\(.*\):$/)) {
+          insideFunction = true;
+          const funcMatch = line.match(/^def (\w+)\((.*)\):$/);
+          currentFunc = funcMatch[1];
+          funcArgs = funcMatch[2].split(',').map(arg => arg.trim());
+          funcBody = [];
+          output += `(関数 ${currentFunc} の定義開始)\n`;
+
+        // 関数呼び出しの処理
+        } else if (line.match(/^\w+\(.*\)$/)) {
+          const callMatch = line.match(/^(\w+)\((.*)\)$/);
+          const fname = callMatch[1];
+          const args = callMatch[2].split(',').map(a => a.trim());
+          
+          if (functions[fname]) {
+            const params = functions[fname].args;
+            const localVars = {};
+            const oldVars = {...variables};
+            
+            // 引数の処理
+            for (let i = 0; i < params.length; i++) {
+              const paramValue = i < args.length ? evaluateExpr(args[i]) : undefined;
+              localVars[params[i]] = paramValue;
+              variables[params[i]] = paramValue;
+            }
+            
+            output += `(関数 ${fname} 呼び出し)\n`;
+            
+            // 関数本体の実行（面倒くささに応じてサボる確率上昇）
+            if (Math.random() < 0.15 * lazinessLevel) {  // たまにサボる
+              output += `  (関数の中身は面倒なので実行しません)\n`;
+            } else {
+              for (let i = 0; i < functions[fname].body.length; i++) {
+                const bodyLine = functions[fname].body[i];
+                if (bodyLine.startsWith('print(')) {
+                  const toPrint = bodyLine.match(/print\((.*)\)/);
+                  if (toPrint) output += `  ${evaluateExpr(toPrint[1])}\n`;
+                } else if (bodyLine.startsWith('return ')) {
+                  const returnVal = bodyLine.slice(7).trim();
+                  output += `  (戻り値: ${evaluateExpr(returnVal)})\n`;
+                  break;
+                } else if (bodyLine.match(/^\w+\s*=\s*.+$/)) {
+                  const [key, val] = bodyLine.split('=').map(s => s.trim());
+                  variables[key] = evaluateExpr(val);
+                  output += `  ${key} = ${variables[key]}\n`;
+                }
+              }
+            }
+            
+            // ローカル変数の状態を元に戻す
+            variables = {...oldVars};
+            
+          } else if (fname === 'len' && args.length === 1) {
+            // len関数の実装
+            const arg = args[0].trim();
+            if (lists[arg]) {
+              output += `${lists[arg].length}\n`;
+            } else {
+              output += '(長さが計算できません)\n';
+            }
+          } else {
+            output += `(関数 ${fname} は定義されていません)\n`;
+          }
+
+        // return文の処理
+        } else if (line.match(/^return .+$/)) {
+          output += '(関数の外でreturnは使えません)\n';
+
+        // その他未対応の構文
+        } else {
+          output += `（未対応の構文）: ${lineRaw}\n`;
+        }
+      });
+
+      document.getElementById("output").innerHTML = highlightOutput(output);
+    }
+    
+    function highlightOutput(text) {
+      // 特定のパターンにハイライトを適用
+      return text
+        .replace(/(（無視）:.*?←.*?$)/gm, '<span class="highlight">$1</span>')
+        .replace(/(\(関数.*?\))/g, '<strong>$1</strong>')
+        .replace(/(エラー|未対応|見つかりません)/g, '<span style="color:#ff6b6b">$1</span>');
+    }
+    
+    function clearOutput() {
+      document.getElementById("output").innerText = '';
+      document.getElementById("error-message").innerText = '';
+    }
+    
+
+  </script>
+</body>
+</html>
