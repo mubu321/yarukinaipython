@@ -1,0 +1,2 @@
+# yarukinaipython
+やる気がないpython
